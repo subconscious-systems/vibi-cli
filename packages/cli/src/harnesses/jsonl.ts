@@ -41,7 +41,8 @@ export function parseLines(text: string): JsonRecord[] {
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     try {
-      records.push(JSON.parse(line));
+      const record: unknown = JSON.parse(line);
+      if (record !== null && typeof record === 'object' && !Array.isArray(record)) records.push(record);
     } catch {
       // Session writers can leave a partial final line after an interrupted run.
     }
@@ -162,7 +163,7 @@ export function firstTimestamp(records: JsonRecord[]): string | null {
   for (const record of records) {
     const value = record?.timestamp ?? record?.payload?.timestamp ?? record?.time;
     if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) return value;
-    if (typeof value === 'number' && value > 0) return new Date(value).toISOString();
+    if (typeof value === 'number' && value > 0 && Number.isFinite(new Date(value).getTime())) return new Date(value).toISOString();
   }
   return null;
 }
