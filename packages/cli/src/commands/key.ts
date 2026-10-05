@@ -59,9 +59,9 @@ export async function changePassword() {
     writeUserKey({
       publicKey: updated.publicKey,
       fingerprint: updated.fingerprint,
-      privateKey: local?.privateKey ?? pair.privateKey,
+      privateKey: local?.publicKey === updated.publicKey && local.privateKey ? pair.privateKey : null,
       createdAt: updated.createdAt,
-      unlockedAt: local?.unlockedAt ?? new Date().toISOString()
+      unlockedAt: local?.publicKey === updated.publicKey && local.privateKey ? local.unlockedAt ?? new Date().toISOString() : null
     });
     console.log('Password changed. Other machines will ask for the new password the next time they unlock.');
   } catch (error) {
