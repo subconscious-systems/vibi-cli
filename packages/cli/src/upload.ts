@@ -23,6 +23,9 @@ export class TraceTooLargeError extends Error {
   }
 }
 
+/** AES-GCM appends a 16-byte authentication tag to the plaintext. */
+export const MAX_PLAINTEXT_BYTES = MAX_TRACE_BYTES - 16;
+
 async function sendCiphertext(config: Config, instruction: UploadInstruction, ciphertext: Buffer, versionId: number, onProgress?: ProgressReporter) {
   const report = (loaded: number, total: number) => onProgress?.({ phase: 'uploading', loaded, total });
   report(0, ciphertext.length);
@@ -71,7 +74,7 @@ export type UploadResult = {
  */
 export async function uploadVersion(config: Config, key: LocalUserKey, input: UploadInput, onProgress?: ProgressReporter): Promise<UploadResult> {
   const { session, trace } = input;
-  if (trace.bytes.length > MAX_TRACE_BYTES) throw new TraceTooLargeError(trace.bytes.length);
+  if (trace.bytes.length > MAX_PLAINTEXT_BYTES) throw new TraceTooLargeError(trace.bytes.length + 16);
   onProgress?.({ phase: 'encrypting', total: trace.bytes.length });
 
   const { header, ciphertext } = encryptTrace({
