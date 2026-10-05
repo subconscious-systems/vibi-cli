@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { archiveRelease } from './archive.mjs';
 
 const CLI_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(CLI_DIR, 'dist');
@@ -79,8 +80,7 @@ if (targets.length) {
 
     const asset = path.join(release, `vibi-${t.name}${t.exe ? '.zip' : '.tar.gz'}`);
     fs.rmSync(asset, { force: true });
-    if (t.exe) execFileSync('zip', ['-q', '-j', asset, outfile], { stdio: 'inherit' });
-    else execFileSync('tar', ['-czf', asset, '-C', outDir, 'vibi'], { stdio: 'inherit' });
+    archiveRelease(asset, outfile);
     const digest = createHash('sha256').update(fs.readFileSync(asset)).digest('hex');
     checksums.push(`${digest}  ${path.basename(asset)}`);
     console.log(`  ${path.relative(CLI_DIR, asset)} (${(fs.statSync(asset).size / 1048576).toFixed(1)} MB)`);
