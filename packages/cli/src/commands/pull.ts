@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   harnessName,
   listRemoteSessionsResponseSchema,
@@ -172,7 +172,7 @@ async function pullTarget(config: Config, key: LocalUserKey, target: Target, opt
   });
   onProgress?.({ phase: 'installing' });
   if (opts.out) {
-    writeFileSync(opts.out, content, { mode: 0o600 });
+    writeOutputTrace(opts.out, content, opts.overwrite);
     onProgress?.({ phase: 'done' });
     return `Wrote ${content.length} bytes of plaintext (${target.description}) to ${opts.out}.`;
   }
@@ -206,6 +206,15 @@ async function pullTarget(config: Config, key: LocalUserKey, target: Target, opt
 }
 
 /** The install report for the terminal: what happened, then how to resume, as a command to copy. */
+export function writeOutputTrace(file: string, content: Buffer, overwrite = false): void {
+  try {
+    writeFileSync(file, content, { mode: 0o600, flag: overwrite ? 'w' : 'wx' });
+  } catch (error) {
+    if (overwrite || (error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    if (!readFileSync(file).equals(content)) throw new InstallConflict(file);
+  }
+}
+
 function formatPullMessage(message: string): string {
   const [head, ...rest] = message.split('\n');
   return [
