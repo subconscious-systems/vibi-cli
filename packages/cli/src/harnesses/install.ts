@@ -41,11 +41,18 @@ export function encodeClaudeProjectDir(projectDir: string) {
 }
 
 function originalBasename(metadata: TraceMetadata, fallback: string) {
-  const base = metadata.sourcePath ? path.basename(metadata.sourcePath) : '';
-  return base && base.endsWith('.jsonl') ? base : fallback;
+  const base = path.win32.basename(path.posix.basename(metadata.sourcePath));
+  return isSafeFilename(base) && base.endsWith('.jsonl') ? base : fallback;
+}
+
+function isSafeFilename(value: string): boolean {
+  return Boolean(value) && value !== '.' && value !== '..' &&
+    !/[<>:"/\\|?*\x00-\x1f]/.test(value) && !/[. ]$/.test(value) &&
+    !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(value);
 }
 
 export function installPathFor(t: Omit<InstallTarget, 'content' | 'overwrite'>): string {
+  if (!isSafeFilename(t.harnessSessionId)) throw new Error('Invalid harness session id for a local file');
   switch (t.harness) {
     case 'claude':
       return path.join(

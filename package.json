@@ -5,7 +5,7 @@
   "packageManager": "pnpm@12.8.1",
   "scripts": {
     "typecheck": "pnpm -r typecheck",
-    "test": "tsx --test packages/shared/test/*.test.ts packages/cli/test/*.test.ts",
+    "test": "node scripts/test.mjs",
     "build:npm": "pnpm --filter vibi build:npm",
     "build:host": "pnpm --filter vibi build:tui:host && pnpm --filter vibi build:host",
     "build": "pnpm --filter vibi build:tui && pnpm --filter vibi build"
