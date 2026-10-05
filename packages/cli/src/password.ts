@@ -1,6 +1,17 @@
 import { createInterface } from 'node:readline';
 import { MIN_PASSWORD_LENGTH } from '@vibivibi/shared/userkey';
 
+let pipedLines: AsyncIterator<string> | undefined;
+
+async function readPipedLine(): Promise<string> {
+  if (!pipedLines) {
+    if (process.stdin.readableEnded || process.stdin.destroyed) return '';
+    pipedLines = createInterface({ input: process.stdin })[Symbol.asyncIterator]();
+  }
+  const line = await pipedLines.next();
+  return line.done ? '' : line.value;
+}
+
 /**
  * Reads a password without echoing it. VIBI_PASSWORD bypasses the prompt
  * (tests, automation); a non-TTY stdin is read as one line.
@@ -10,14 +21,7 @@ export function promptHidden(question: string): Promise<string> {
     return Promise.resolve(process.env.VIBI_PASSWORD);
   }
   if (!process.stdin.isTTY) {
-    return new Promise((resolve) => {
-      const rl = createInterface({ input: process.stdin });
-      rl.once('line', (line) => {
-        rl.close();
-        resolve(line);
-      });
-      rl.once('close', () => resolve(''));
-    });
+    return readPipedLine();
   }
   return new Promise((resolve, reject) => {
     const stdin = process.stdin;
@@ -67,12 +71,14 @@ export async function promptNewPassword(): Promise<string> {
     if (first.length < MIN_PASSWORD_LENGTH) {
       console.log(`Too short; use at least ${MIN_PASSWORD_LENGTH} characters.`);
       if (process.env.VIBI_PASSWORD !== undefined) throw new Error('VIBI_PASSWORD is too short');
+      if (!process.stdin.isTTY) throw new Error('Encryption password input ended or is too short');
       continue;
     }
     const second = await promptHidden('Repeat it: ');
     if (first !== second) {
       console.log('They do not match; try again.');
       if (process.env.VIBI_PASSWORD !== undefined) throw new Error('unreachable');
+      if (!process.stdin.isTTY) throw new Error('Encryption passwords do not match or confirmation input ended');
       continue;
     }
     return first;
