@@ -1,11 +1,17 @@
 import { wrapPrivateKey } from '@vibivibi/shared/userkey';
+import { publicKeyFingerprint } from '@vibivibi/shared/crypto';
 import { PASSPHRASE_SCRYPT_PARAMS, generatePassphrase, normalizePassphrase } from '@vibivibi/shared/passphrase';
 import { listPendingRecipientsResponseSchema } from '@vibivibi/shared/sessions';
 import { z } from 'zod';
 import { ApiError, request } from '../api';
 import { requireConfig } from '../config';
 import { fail } from '../log';
-import { readState, writeState } from '../state';
+import { readState, writeState, type State } from '../state';
+
+export function pendingKeyFor(state: State, remote: {email: string; fingerprint: string}) {
+  const local = state.pending[remote.email];
+  return local && local.fingerprint === remote.fingerprint && publicKeyFingerprint(local.publicKey) === remote.fingerprint ? local : undefined;
+}
 
 /**
  * `vibi pending`              people you sent sessions to before they had a key, with the passphrases made here
@@ -20,8 +26,8 @@ export async function pending(opts: { reset?: string; json?: boolean }) {
       const email = opts.reset.trim().toLowerCase();
       const row = pending.find((p) => p.email === email && !p.claimedAt);
       if (!row) fail(`no open provisional recipient for ${email}.`);
-      const local = state.pending[email];
-      if (!local || local.publicKey === undefined) fail(`the provisional key for ${email} was made on another machine; run \`vibi pending --reset\` there.`);
+      const local = pendingKeyFor(state, row);
+      if (!local) throw new Error(`the current provisional key for ${email} is not on this machine; run \`vibi pending --reset\` on the machine that made it.`);
       const passphrase = generatePassphrase();
       const encryptedPrivateKey = wrapPrivateKey({ publicKey: local.publicKey, privateKey: local.privateKey }, normalizePassphrase(passphrase), PASSPHRASE_SCRYPT_PARAMS);
       await request(config.serverUrl, `/api/client/pending-recipients/${row.id}`, {
@@ -36,7 +42,7 @@ export async function pending(opts: { reset?: string; json?: boolean }) {
       return;
     }
     if (opts.json) {
-      console.log(JSON.stringify(pending.map((p) => ({ ...p, passphrase: state.pending[p.email]?.passphrase ?? null })), null, 2));
+      console.log(JSON.stringify(pending.map((p) => ({ ...p, passphrase: pendingKeyFor(state, p)?.passphrase ?? null })), null, 2));
       return;
     }
     if (pending.length === 0) {
@@ -44,7 +50,7 @@ export async function pending(opts: { reset?: string; json?: boolean }) {
       return;
     }
     for (const p of pending) {
-      const local = state.pending[p.email];
+      const local = pendingKeyFor(state, p);
       const status = p.claimedAt
         ? `claimed ${new Date(p.claimedAt).toLocaleDateString()}`
         : Date.parse(p.expiresAt) < Date.now()
