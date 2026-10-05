@@ -1,6 +1,7 @@
 import { harnessName } from '@vibivibi/shared/sessions';
 import { discoverContext, discoverLocalSessions, scanHome } from '../harnesses';
 import { readState } from '../state';
+import { sessionStatus } from '../push';
 
 function formatSize(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -19,12 +20,7 @@ export async function sessions(opts: { max: string; json?: boolean }) {
   const state = readState();
   console.log(`Scanning ${scanHome()} — ${found.length} session(s) found\n`);
   for (const s of found) {
-    const synced = state.sessions[s.key];
-    const status = synced
-      ? synced.mtimeMs === s.mtimeMs && synced.sizeBytes === s.sizeBytes
-        ? 'synced'
-        : 'changed'
-      : 'new';
+    const status = sessionStatus(s, state);
     console.log(`${s.key}  ${s.title}`);
     console.log(
       `    ${harnessName(s.harness)} · ${new Date(s.updatedMs).toLocaleString()}` +
