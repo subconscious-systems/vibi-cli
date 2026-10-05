@@ -129,7 +129,7 @@ export async function uploadVersion(config: Config, key: LocalUserKey, input: Up
     plaintextHash: input.plaintextHash,
     keyFingerprint: key.fingerprint,
     syncedAt: new Date().toISOString(),
-    label: input.label ?? state.sessions[session.key]?.label ?? null,
+    label: input.label !== undefined ? input.label : state.sessions[session.key]?.label ?? null,
     pullId: registered.pullId
   };
   writeState(state);
