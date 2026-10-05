@@ -33,8 +33,8 @@ export async function sessionsForDirectory(dir: string, max = 500): Promise<Loca
   return all.filter((s) => {
     if (s.harness === 'claude' && s.sourcePath && path.basename(path.dirname(s.sourcePath)) === claudeFolder) return true;
     if (!s.cwd) return false;
-    const cwd = path.resolve(s.cwd);
-    return cwd === root || cwd.startsWith(root + path.sep);
+    const relative = path.relative(root, path.resolve(s.cwd));
+    return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
   });
 }
 
