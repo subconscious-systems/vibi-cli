@@ -17,10 +17,11 @@ after(async () => {
 const meta = { title: 't', cwd: '/work/x', model: '', messageCount: 1, sourcePath: '', startedAt: null };
 
 test('Claude Code project directories are encoded the way Claude Code does it', () => {
-  assert.equal(encodeClaudeProjectDir('/Users/hongyinluo/Desktop/cybermind'), '-Users-hongyinluo-Desktop-cybermind');
-  assert.equal(encodeClaudeProjectDir('/Users/me/my_app.v2'), '-Users-me-my-app-v2');
+  const prefix = process.platform === 'win32' ? `${path.parse(process.cwd()).root[0]}--` : '-';
+  assert.equal(encodeClaudeProjectDir('/Users/hongyinluo/Desktop/cybermind'), `${prefix}Users-hongyinluo-Desktop-cybermind`);
+  assert.equal(encodeClaudeProjectDir('/Users/me/my_app.v2'), `${prefix}Users-me-my-app-v2`);
   const file = installPathFor({ harness: 'claude', harnessSessionId: 'abc', harnessUpdatedAt: '2026-10-01T10:00:00Z', metadata: meta, home, projectDir: '/work/x' });
-  assert.equal(file, path.join(home, '.claude', 'projects', '-work-x', 'abc.jsonl'));
+  assert.equal(file, path.join(home, '.claude', 'projects', `${prefix}work-x`, 'abc.jsonl'));
 });
 
 test('other harnesses keep their original file names and date folders', () => {
