@@ -40,10 +40,16 @@ function toTuiSessions(sessions: LocalSession[]): TuiSession[] {
   }));
 }
 
-function findSession(sessions: LocalSession[], ref: string) {
-  const index = Number(ref);
-  if (Number.isInteger(index) && index >= 1 && index <= sessions.length) return sessions[index - 1];
-  return sessions.find((s) => s.key === ref || s.id === ref || s.id.startsWith(ref)) ?? null;
+export function findSession(sessions: LocalSession[], ref: string) {
+  const wanted = ref.trim();
+  if (!wanted) return null;
+  const exact = sessions.filter((s) => s.key === wanted || s.id === wanted);
+  if (exact.length > 1) throw new Error(`Session "${ref}" is ambiguous; use a full harness:id key.`);
+  if (exact.length === 1) return exact[0];
+  if (/^[1-9]\d*$/.test(wanted)) return sessions[Number(wanted) - 1] ?? null;
+  const matches = sessions.filter((s) => s.id.startsWith(wanted));
+  if (matches.length > 1) throw new Error(`Session "${ref}" is ambiguous; use a full harness:id key.`);
+  return matches[0] ?? null;
 }
 
 /**
