@@ -58,7 +58,7 @@ export async function createUserKey(config: Config, opts: { remember?: boolean }
   const local = localFrom(remote, remember ? pair.privateKey : null);
   writeUserKey(local);
   console.log(remember ? ok('The unlocked key is kept on this machine (`vibi lock` forgets it).') : dim('The private key is not kept on this machine; commands that need it will ask for the password.'));
-  return local;
+  return localFrom(remote, pair.privateKey);
 }
 
 /**
@@ -116,6 +116,7 @@ export async function ensureUserKey(config: Config, opts: { unlock: boolean; rem
   const remote = await fetchUserKey(config);
   if (!remote) return createUserKey(config, { remember: opts.remember });
   const local = rememberPublicKey(remote);
+  if (opts.remember === false && local.privateKey) writeUserKey(localFrom(remote, null));
   if (local.privateKey || !opts.unlock) return local;
   const unlocked = await unlockUserKey(config, remote, { remember: false, optional: true });
   if (!unlocked) return local;
@@ -126,7 +127,7 @@ export async function ensureUserKey(config: Config, opts: { unlock: boolean; rem
   } else {
     console.log(dim('The private key is not kept on this machine; commands that need it will ask for the password.'));
   }
-  return remember ? unlocked : local;
+  return unlocked;
 }
 
 /**
