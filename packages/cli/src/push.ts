@@ -293,9 +293,17 @@ export async function sendSession(
       });
       if (label !== undefined && (label || null) !== (prev!.label ?? null)) {
         await setLabel(config, prev!.sessionId, label || null);
-        state.sessions[session.key] = { ...prev!, label: label || null };
-        writeState(state);
       }
+      state.sessions[session.key] = {
+        ...prev!,
+        label: label !== undefined ? label || null : prev!.label ?? null,
+        sourcePath: session.sourcePath,
+        mtimeMs: session.mtimeMs,
+        sizeBytes: session.sizeBytes,
+        updatedMs: session.updatedMs,
+        pullId: detail!.pullId
+      };
+      writeState(state);
       opts.onProgress?.({ phase: 'done' });
       return { sessionId: prev!.sessionId, pullId: detail!.pullId, versionId: version.id, seq: version.seq, uploaded: false, recipient: recipient.email, reusedVersion: true, ...extra };
     }
