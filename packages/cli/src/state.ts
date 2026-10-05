@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { configDir } from './config';
@@ -47,15 +48,27 @@ export type State = z.infer<typeof stateSchema>;
 export const statePath = () => join(configDir(), 'state.json');
 
 export function readState(): State {
-  if (!existsSync(statePath())) return { version: 1, sessions: {}, pending: {} };
+  let text: string;
   try {
-    return stateSchema.parse(JSON.parse(readFileSync(statePath(), 'utf8')));
-  } catch {
-    return { version: 1, sessions: {}, pending: {} };
+    text = readFileSync(statePath(), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, sessions: {}, pending: {} };
+    throw error;
+  }
+  try {
+    return stateSchema.parse(JSON.parse(text));
+  } catch (error) {
+    throw new Error(`Cannot read local state at ${statePath()}; preserve this file and restore a valid backup before continuing.`, { cause: error });
   }
 }
 
 export function writeState(state: State) {
+  const validated = stateSchema.parse(state);
+  if (existsSync(statePath())) readState();
   mkdirSync(configDir(), { recursive: true, mode: 0o700 });
-  writeFileSync(statePath(), JSON.stringify(state, null, 2) + '\n', { mode: 0o600 });
+  const temporary = `${statePath()}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, JSON.stringify(validated, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+    renameSync(temporary, statePath());
+  } finally { rmSync(temporary, { force: true }); }
 }
