@@ -123,6 +123,18 @@ function ownTarget(session: RemoteSession, version?: SessionDetail['versions'][n
 
 const normalizeId = (id: string) => id.trim().replace(/^#/, '').toLowerCase();
 
+export function selectVersion(versions: SessionDetail['versions'], rawRef: string): SessionDetail['versions'][number] {
+  const ref = rawRef.trim();
+  const stored = versions.filter((v) => v.status === 'stored');
+  let matches: SessionDetail['versions'];
+  if (/^id:[1-9]\d*$/.test(ref)) matches = stored.filter((v) => v.id === Number(ref.slice(3)));
+  else if (/^v?[1-9]\d*$/i.test(ref)) matches = stored.filter((v) => v.seq === Number(ref.replace(/^v/i, '')));
+  else if (/^[A-Za-z0-9_-]+$/.test(ref)) matches = stored.filter((v) => v.contentHash.startsWith(ref));
+  else matches = [];
+  if (matches.length !== 1) throw new Error(`--rev ${rawRef} matches ${matches.length} versions; use --versions to list them.`);
+  return matches[0];
+}
+
 /** A pull id (own session or share), optionally a version by number `3` / `v3` or a content-hash prefix. */
 async function resolveTarget(config: Config, id: string, versionRef: string | undefined): Promise<Target> {
   const { sessions, shared } = await fetchList(config);
@@ -134,17 +146,11 @@ async function resolveTarget(config: Config, id: string, versionRef: string | un
   if (session) {
     if (!versionRef) return ownTarget(session);
     const detail = await fetchDetail(config, session.id);
-    const ref = versionRef.trim().replace(/^v/i, '');
-    const matches = detail.versions.filter(
-      (v) => v.status === 'stored' && (byRowId !== null ? v.id === byRowId : String(v.seq) === ref || v.contentHash.startsWith(ref))
-    );
-    if (matches.length !== 1) throw new Error(`--rev ${versionRef} matches ${matches.length} versions; run \`vibi pull ${id} --versions\`.`);
-    return ownTarget(session, matches[0]);
+    return ownTarget(session, selectVersion(detail.versions, versionRef));
   }
   const share = shared.find((s) => s.pullId === wanted);
   if (share) {
-    const refId = byRowId !== null ? byRowId : versionRef ? Number(versionRef.replace(/^v/i, '')) : null;
-    if (refId !== null && refId !== share.versionId) {
+    if (versionRef !== undefined && byRowId !== share.versionId) {
       throw new Error('shared sessions refer to one version; --rev does not apply.');
     }
     return sharedTarget(share);
