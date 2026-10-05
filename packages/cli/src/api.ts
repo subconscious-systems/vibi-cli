@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { apiErrorSchema } from '@vibivibi/shared/api';
+import { MAX_TRACE_BYTES } from '@vibivibi/shared/sessions';
 import { VERSION } from './version';
 
 export class ApiError extends Error {
@@ -126,8 +127,10 @@ export async function putBytes(
 export async function getBytes(
   url: URL,
   token: string,
-  onProgress?: (loaded: number, total: number) => void
+  onProgress?: (loaded: number, total: number) => void,
+  maxBytes = MAX_TRACE_BYTES
 ): Promise<Buffer> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > MAX_TRACE_BYTES) throw new Error('Invalid ciphertext download size limit');
   let response: Response;
   try {
     response = await fetch(url, { headers: { authorization: `Bearer ${token}`, accept: 'application/octet-stream' } });
@@ -144,16 +147,30 @@ export async function getBytes(
     throw new ApiError(response.status, message);
   }
   const total = Number(response.headers.get('content-length') ?? 0);
-  if (!response.body) return Buffer.from(await response.arrayBuffer());
+  if (!Number.isSafeInteger(total) || total < 0 || total > maxBytes) {
+    await response.body?.cancel();
+    throw new ApiError(response.status, `Download exceeds the ${maxBytes} byte limit or has an invalid Content-Length`);
+  }
+  if (!response.body) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > maxBytes) throw new ApiError(response.status, `Download exceeds the ${maxBytes} byte limit`);
+    return bytes;
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let loaded = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.byteLength;
-    onProgress?.(loaded, total || loaded);
-  }
-  return Buffer.concat(chunks);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      loaded += value.byteLength;
+      if (loaded > maxBytes) throw new ApiError(response.status, `Download exceeds the ${maxBytes} byte limit`);
+      chunks.push(value);
+      onProgress?.(loaded, total || loaded);
+    }
+    return Buffer.concat(chunks, loaded);
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {reader.releaseLock();}
 }

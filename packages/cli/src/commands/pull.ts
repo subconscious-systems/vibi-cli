@@ -158,7 +158,8 @@ async function pullTarget(config: Config, key: LocalUserKey, target: Target, opt
   const ciphertext = await getBytes(
     new URL(`/api/client/session-versions/${target.versionId}/content`, config.serverUrl),
     config.deviceToken,
-    (loaded, total) => onProgress?.({ phase: 'downloading', loaded, total: total || target.sizeBytes })
+    (loaded, total) => onProgress?.({ phase: 'downloading', loaded, total: total || target.sizeBytes }),
+    target.sizeBytes
   );
   onProgress?.({ phase: 'decrypting' });
   if (ciphertext.length !== target.sizeBytes) throw new Error(`downloaded ${ciphertext.length} bytes, expected ${target.sizeBytes}.`);
